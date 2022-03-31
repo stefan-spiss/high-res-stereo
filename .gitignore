@@ -14,7 +14,62 @@ weights/
 *.ipynb
 data-HRRS/
 mboutput/*.npy
-mboutput/CrusadeP/*.pfm
-mboutput/CrusadeP/*.txt
+mboutput/CrusadeP*
 *.zip
 run.sh
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# build directories
+build
+build-debug
+debug
+*build*/
+
+# intellij
+.idea
+cmake-build-debug
+
+# subproject directories
+# subprojects/*
+# !subprojects/*.wrap
+
+# point clouds
+*.ply
+pointclouds/
+
+# build files
+compile_commands.json
+
+venv/
