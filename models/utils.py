@@ -215,9 +215,9 @@ class pyramidPooling(nn.Module):
         k_sizes = []
         strides = []
         if self.pool_sizes is None: 
-            for pool_size in np.linspace(1,min(h,w)//2,4,dtype=int):
-                k_sizes.append((int(h/pool_size), int(w/pool_size)))
-                strides.append((int(h/pool_size), int(w/pool_size)))
+            for pool_size in np.linspace(1,torch.div(min(h,w), 2, rounding_mode='floor'),4,dtype=int):
+                k_sizes.append((torch.true_divide(h,pool_size).type(torch.IntTensor), torch.true_divide(w,pool_size).type(torch.IntTensor)))
+                strides.append((torch.true_divide(h,pool_size).type(torch.IntTensor), torch.true_divide(w,pool_size).type(torch.IntTensor)))
             k_sizes = k_sizes[::-1]
             strides = strides[::-1]
         else:

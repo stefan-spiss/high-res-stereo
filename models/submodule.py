@@ -48,7 +48,7 @@ class projfeat3d(nn.Module):
         b,c,d,h,w = x.size()
         x = self.conv1(x.view(b,c,d,h*w))
         x = self.bn(x)
-        x = x.view(b,-1,d//self.stride[0],h,w)
+        x = x.view(b,-1,torch.div(d, self.stride[0], rounding_mode='floor'),h,w)
         return x
 
 # original conv3d block
@@ -135,8 +135,8 @@ class decoderBlock(nn.Module):
         if self.pool:
             fvl_out = fvl
             _,_,d,h,w=fvl.shape
-            for i,pool_size in enumerate(np.linspace(1,min(d,h,w)//2,4,dtype=int)):
-                kernel_size = (int(d/pool_size), int(h/pool_size), int(w/pool_size))
+            for i,pool_size in enumerate(np.linspace(1,torch.div(min(d,h,w), 2, rounding_mode='floor'),4,dtype=int)):
+                kernel_size = (torch.true_divide(d,pool_size).type(torch.IntTensor), torch.true_divide(h,pool_size).type(torch.IntTensor), torch.true_divide(w,pool_size).type(torch.IntTensor))
                 out = F.avg_pool3d(fvl, kernel_size, stride=kernel_size)       
                 out = self.pool_convs[i](out)
                 out = F.upsample(out, size=(d,h,w), mode='trilinear')
