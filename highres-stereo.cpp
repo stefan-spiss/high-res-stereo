@@ -181,7 +181,19 @@ int main(int argc, const char* argv[])
   tensorLeftImg = tensorLeftImg.to(targetDevice);
   tensorRightImg = tensorRightImg.to(targetDevice);
 
+  torch::NoGradGuard no_grad;
+  double processingTime;
+  auto start = std::chrono::high_resolution_clock::now();
   auto result = model.forward({ tensorLeftImg, tensorRightImg }).toTuple();
+  auto stop = std::chrono::high_resolution_clock::now();
+  processingTime = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+  std::cout << "Runtime: " << processingTime << std::endl;
+
+  /* start = std::chrono::high_resolution_clock::now(); */
+  /* result = model.forward({ tensorLeftImg, tensorRightImg }).toTuple(); */
+  /* stop = std::chrono::high_resolution_clock::now(); */
+  /* processingTime = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count(); */
+  /* std::cout << "Runtime: " << processingTime << std::endl; */
 
   auto dispTensor = result->elements()[0].toTensor();
   auto entropyTensor = result->elements()[1].toTensor();
