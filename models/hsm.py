@@ -2,7 +2,6 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 import torch.utils.data
-from torch.autograd import Variable
 import torch.nn.functional as F
 import math
 from .submodule import *
@@ -11,7 +10,7 @@ from models.utils import unet
 from matplotlib import pyplot as plt
 
 class HSMNet(nn.Module):
-    def __init__(self, maxdisp,clean,level=1):
+    def __init__(self, maxdisp, clean, level=1):
         super(HSMNet, self).__init__()
         self.maxdisp = maxdisp
         self.clean = clean
@@ -38,13 +37,13 @@ class HSMNet(nn.Module):
 
    
 
-    def feature_vol(self, refimg_fea, targetimg_fea,maxdisp, leftview=True):
+    def feature_vol(self, refimg_fea, targetimg_fea, maxdisp: int, leftview:bool=True):
         '''
         diff feature volume
         '''
-        width = refimg_fea.shape[-1]
-        # cost = Variable(torch.cuda.FloatTensor(refimg_fea.size()[0], refimg_fea.size()[1], maxdisp,  refimg_fea.size()[2],  refimg_fea.size()[3]).fill_(0.))
-        cost = Variable(torch.zeros([refimg_fea.size()[0], refimg_fea.size()[1], maxdisp,  refimg_fea.size()[2],  refimg_fea.size()[3]], dtype=torch.float32, device=refimg_fea.device))
+        width = refimg_fea.size()[-1]
+        # cost = torch.cuda.FloatTensor(refimg_fea.size()[0], refimg_fea.size()[1], maxdisp,  refimg_fea.size()[2],  refimg_fea.size()[3]).fill_(0.)
+        cost = torch.zeros([int(refimg_fea.size()[0]), int(refimg_fea.size()[1]), int(maxdisp),  int(refimg_fea.size()[2]),  int(refimg_fea.size()[3])], dtype=torch.float32, device=refimg_fea.device)
         for i in range(min(maxdisp, width)):
             feata = refimg_fea[:,:,:,i:width]
             featb = targetimg_fea[:,:,:,:width-i]
@@ -58,7 +57,7 @@ class HSMNet(nn.Module):
 
 
     def forward(self, left, right):
-        nsample = left.shape[0]
+        nsample = left.size()[0]
         conv4,conv3,conv2,conv1  = self.feature_extraction(torch.cat([left,right],0))
         conv40,conv30,conv20,conv10  = conv4[:nsample], conv3[:nsample], conv2[:nsample], conv1[:nsample]
         conv41,conv31,conv21,conv11  = conv4[nsample:], conv3[nsample:], conv2[nsample:], conv1[nsample:]
@@ -73,37 +72,58 @@ class HSMNet(nn.Module):
 
         feat5_2x, cost5 = self.decoder5(feat5)
         if self.level > 2:
-            cost3 = F.upsample(cost5, [left.size()[2],left.size()[3]], mode='bilinear')
+            # cost3 = F.upsample(cost5, [left.size()[2],left.size()[3]], mode='bilinear')
+            cost3 = F.interpolate(cost5, [left.size()[2],left.size()[3]], mode='bilinear')
+            cost4 = None
         else:
             feat4 = torch.cat((feat5_2x, feat4),dim=1)
 
             feat4_2x, cost4 = self.decoder4(feat4) # 32
             if self.level > 1:
-                cost3 = F.upsample((cost4).unsqueeze(1), [self.disp_reg8.disp.shape[1], left.size()[2],left.size()[3]], mode='trilinear').squeeze(1)
+                # cost3 = F.upsample((cost4).unsqueeze(1), [self.disp_reg8.disp.size()[1], left.size()[2],left.size()[3]], mode='trilinear').squeeze(1)
+                cost3 = F.interpolate((cost4).unsqueeze(1), [self.disp_reg8.disp.size()[1], left.size()[2],left.size()[3]], mode='trilinear').squeeze(1)
             else:
                 feat3 = torch.cat((feat4_2x, feat3),dim=1)
 
                 feat3_2x, cost3 = self.decoder3(feat3) # 32
-                cost3 = F.upsample(cost3, [left.size()[2],left.size()[3]], mode='bilinear')
+                # cost3 = F.upsample(cost3, [left.size()[2],left.size()[3]], mode='bilinear')
+                cost3 = F.interpolate(cost3, [left.size()[2],left.size()[3]], mode='bilinear')
         if self.level > 2:
             final_reg = self.disp_reg32
+            if self.training or self.clean==-1:
+                pred3, _ = final_reg(F.softmax(cost3,1)); entropy = pred3  # to save memory
+            else:
+                pred3, entropy = final_reg(F.softmax(cost3,1),ifent=True)
+                if entropy is not None:
+                    pred3[entropy>self.clean] = np.inf
         else:
             final_reg = self.disp_reg8
+            if self.training or self.clean==-1:
+                pred3, _ = final_reg(F.softmax(cost3,1)); entropy = pred3  # to save memory
+            else:
+                pred3, entropy = final_reg(F.softmax(cost3,1),ifent=True)
+                if entropy is not None:
+                    pred3[entropy>self.clean] = np.inf
 
-        if self.training or self.clean==-1:
-            pred3 = final_reg(F.softmax(cost3,1)); entropy = pred3  # to save memory
+        if torch.jit.is_scripting():
+            if entropy is not None:
+                entropy = torch.squeeze(entropy)
+            return pred3, entropy
         else:
-            pred3,entropy = final_reg(F.softmax(cost3,1),ifent=True)
-            pred3[entropy>self.clean] = np.inf
-
-        if self.training:
-            cost6 = F.upsample((cost6).unsqueeze(1), [self.disp_reg8.disp.shape[1], left.size()[2],left.size()[3]], mode='trilinear').squeeze(1)
-            cost5 = F.upsample((cost5).unsqueeze(1), [self.disp_reg8.disp.shape[1], left.size()[2],left.size()[3]], mode='trilinear').squeeze(1)
-            cost4 = F.upsample(cost4, [left.size()[2],left.size()[3]], mode='bilinear')
-            pred6 = self.disp_reg16(F.softmax(cost6,1))
-            pred5 = self.disp_reg16(F.softmax(cost5,1))
-            pred4 = self.disp_reg16(F.softmax(cost4,1))
-            stacked = [pred3,pred4,pred5,pred6]   
-            return stacked,entropy
-        else:
-            return pred3,torch.squeeze(entropy)
+            if self.training:
+                # cost6 = F.upsample((cost6).unsqueeze(1), [self.disp_reg8.disp.size()[1], left.size()[2],left.size()[3]], mode='trilinear').squeeze(1)
+                cost6 = F.interpolate((cost6).unsqueeze(1), [self.disp_reg8.disp.size()[1], left.size()[2],left.size()[3]], mode='trilinear').squeeze(1)
+                # cost5 = F.upsample((cost5).unsqueeze(1), [self.disp_reg8.disp.size()[1], left.size()[2],left.size()[3]], mode='trilinear').squeeze(1)
+                cost5 = F.interpolate((cost5).unsqueeze(1), [self.disp_reg8.disp.size()[1], left.size()[2],left.size()[3]], mode='trilinear').squeeze(1)
+                pred6 = self.disp_reg16(F.softmax(cost6,1))
+                pred5 = self.disp_reg16(F.softmax(cost5,1))
+                if self.level > 2:
+                    # cost4 = F.upsample(cost4, [left.size()[2],left.size()[3]], mode='bilinear')
+                    cost4 = F.interpolate(cost4, [left.size()[2],left.size()[3]], mode='bilinear')
+                    pred4 = self.disp_reg16(F.softmax(cost4,1))
+                else:
+                    pred4 = None
+                stacked = [pred3,pred4,pred5,pred6]   
+                return stacked,entropy
+            else:
+                return pred3,torch.squeeze(entropy)

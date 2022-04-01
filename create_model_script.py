@@ -68,12 +68,11 @@ def main():
         imgR = torch.FloatTensor(imgR)
 
 
-    # trace model and save it
-    traced_script_module = trace_model(module, imgL, imgR)
-    traced_script_name = 'traced_highresnet_script-%s-%s-max_disp_%s-clean_%s-level_%s.pt'% (('cuda' if run_cuda else 'cpu'), args.outfilename, module.maxdisp, args.clean, args.level)
+    script_module = create_script_model(module, imgL, imgR)
+    script_module_name = 'highresnet_script-%s-%s-max_disp_%s-clean_%s-level_%s.pt'% (('cuda' if run_cuda else 'cpu'), args.outfilename, module.maxdisp, args.clean, args.level)
     if not os.path.exists(args.outdir):
         os.makedirs(args.outdir)
-    traced_script_module.save('%s/%s'%(args.outdir, traced_script_name))
+    script_module.save('%s/%s'%(args.outdir, script_module_name))
 
     # run model inference and traced model inference and measure time
     print("pytorch model - run 1:")
@@ -81,18 +80,19 @@ def main():
     print("pytorch model - run 2:")
     pred_disp_m, entropy_m, _ = perform_inference(model, imgL, imgR, run_cuda)
 
-    traced_model = traced_script_module;
+    script_model = script_module;
     if run_cuda:
-        traced_model = nn.DataParallel(traced_script_module, device_ids=[0])
-        # traced_model = traced_script_module
-        traced_model.cuda().eval()
+        script_model = nn.DataParallel(script_model, device_ids=[0])
+        script_model.cuda().eval()
     else:
-        traced_model.eval()
+        script_model.eval()
 
-    print("traced model - run 1:")
-    perform_inference(traced_model, imgL, imgR, run_cuda)
-    print("traced model - run 2:")
-    pred_disp, entropy, _ = perform_inference(traced_model, imgL, imgR, run_cuda)
+    print("scripted model - run 1:")
+    perform_inference(script_model, imgL, imgR, run_cuda)
+    print("scripted model - run 2:")
+    perform_inference(script_model, imgL, imgR, run_cuda)
+    print("scripted model - run 3:")
+    pred_disp, entropy, _ = perform_inference(script_model, imgL, imgR, run_cuda)
 
     print("Resulting disparities are the same: " + str(torch.allclose(pred_disp_m, pred_disp, rtol=1e-4, atol=1e-4, equal_nan=True)))
     print("Resulting entropies are the same: " + str(torch.allclose(entropy_m, entropy, rtol=1e-4, atol=1e-4, equal_nan=True)))
@@ -132,4 +132,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 

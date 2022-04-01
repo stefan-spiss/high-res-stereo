@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pdb
 import math
-from torch.autograd import Variable
+from typing import List, Tuple
 
 
 class unet(nn.Module):
@@ -210,14 +210,15 @@ class pyramidPooling(nn.Module):
     
     #@profile
     def forward(self, x):
-        h, w = x.shape[2:]
+        h, w = x.size()[2:]
 
-        k_sizes = []
-        strides = []
+        k_sizes = torch.jit.annotate(List[Tuple[int, int]], [])
+        strides = torch.jit.annotate(List[Tuple[int, int]], [])
         if self.pool_sizes is None: 
-            for pool_size in np.linspace(1,torch.div(min(h,w), 2, rounding_mode='floor'),4,dtype=int):
-                k_sizes.append((torch.true_divide(h,pool_size).type(torch.IntTensor), torch.true_divide(w,pool_size).type(torch.IntTensor)))
-                strides.append((torch.true_divide(h,pool_size).type(torch.IntTensor), torch.true_divide(w,pool_size).type(torch.IntTensor)))
+            # for pool_size in np.linspace(1,torch.div(min(h,w), 2, rounding_mode='floor'),4,dtype=int):
+            for pool_size in torch.linspace(1,torch.div(torch.tensor([min(h,w)]), 2, rounding_mode='floor').item(),4,dtype=torch.int):
+                k_sizes.append((torch.true_divide(torch.tensor([h]),pool_size).type(torch.int).item(), torch.true_divide(torch.tensor([w]),pool_size).type(torch.int).item()))
+                strides.append((torch.true_divide(torch.tensor([h]),pool_size).type(torch.int).item(), torch.true_divide(torch.tensor([w]),pool_size).type(torch.int).item()))
             k_sizes = k_sizes[::-1]
             strides = strides[::-1]
         else:
@@ -227,13 +228,21 @@ class pyramidPooling(nn.Module):
         if self.fusion_mode == 'cat': # pspnet: concat (including x)
             output_slices = [x]
 
-            for i, (module, pool_size) in enumerate(zip(self.path_module_list, self.pool_sizes)):
+            for i, module in enumerate(self.path_module_list):
                 out = F.avg_pool2d(x, k_sizes[i], stride=strides[i], padding=0)
-                #out = F.adaptive_avg_pool2d(x, output_size=(pool_size, pool_size))
                 if self.model_name != 'icnet':
                     out = module(out)
-                out = F.upsample(out, size=(h,w), mode='bilinear')
+                # out = F.upsample(out, size=(h,w), mode='bilinear')
+                out = F.interpolate(out, size=(h,w), mode='bilinear')
                 output_slices.append(out)
+
+            #for i, (module, pool_size) in enumerate(zip(self.path_module_list, self.pool_sizes)):
+            #    #out = F.avg_pool2d(x, k_sizes[i], stride=strides[i], padding=0)
+            #    out = F.adaptive_avg_pool2d(x, output_size=(pool_size, pool_size))
+            #    if self.model_name != 'icnet':
+            #        out = module(out)
+            #    out = F.upsample(out, size=(h,w), mode='bilinear')
+            #    output_slices.append(out)
 
             return torch.cat(output_slices, dim=1)
         else: # icnet: element-wise sum (including x)
@@ -242,7 +251,8 @@ class pyramidPooling(nn.Module):
             for i, module in enumerate(self.path_module_list):
                 out = F.avg_pool2d(x, k_sizes[i], stride=strides[i], padding=0)
                 out = module(out)
-                out = F.upsample(out, size=(h,w), mode='bilinear')
+                # out = F.upsample(out, size=(h,w), mode='bilinear')
+                out = F.interpolate(out, size=(h,w), mode='bilinear')
                 pp_sum = pp_sum + 0.25*out
             pp_sum = F.relu(pp_sum/2.,inplace=True)
 

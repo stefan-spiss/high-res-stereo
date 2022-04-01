@@ -2,7 +2,6 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 import torch.utils.data
-from torch.autograd import Variable
 import torch.nn.functional as F
 import math
 import numpy as np
@@ -26,7 +25,7 @@ class sepConv3dBlock(nn.Module):
 
     def forward(self,x):
         out = F.relu(self.conv1(x),inplace=True)
-        if self.downsample:
+        if self.downsample is not None:
             x = self.downsample(x)
         out = F.relu(x + self.conv2(out),inplace=True)
         return out
@@ -48,7 +47,7 @@ class projfeat3d(nn.Module):
         b,c,d,h,w = x.size()
         x = self.conv1(x.view(b,c,d,h*w))
         x = self.bn(x)
-        x = x.view(b,-1,torch.div(d, self.stride[0], rounding_mode='floor'),h,w)
+        x = x.view(b,-1,torch.div(torch.tensor(d), self.stride[0], rounding_mode='floor'),h,w)
         return x
 
 # original conv3d block
@@ -67,11 +66,11 @@ class disparityregression(nn.Module):
     def __init__(self, maxdisp,divisor):
         super(disparityregression, self).__init__()
         maxdisp = int(maxdisp/divisor)
-        #self.disp = Variable(torch.Tensor(np.reshape(np.array(range(maxdisp)),[1,maxdisp,1,1])).cuda(), requires_grad=False)
+        #self.disp = torch.Tensor(np.reshape(np.array(range(maxdisp)),[1,maxdisp,1,1])).cuda()
         self.register_buffer('disp',torch.Tensor(np.reshape(np.array(range(maxdisp)),[1,maxdisp,1,1])))
         self.divisor = divisor
 
-    def forward(self, x,ifent=False):
+    def forward(self, x,ifent: bool=False):
         disp = self.disp.repeat(x.size()[0],1,x.size()[2],x.size()[3])
         out = torch.sum(x*disp,1) * self.divisor
 
@@ -81,7 +80,7 @@ class disparityregression(nn.Module):
             ent = (-x*x.log()).sum(dim=1)
             return out,ent
         else:
-            return out
+            return out,None
 
 
 class decoderBlock(nn.Module):
@@ -98,9 +97,8 @@ class decoderBlock(nn.Module):
                                        nn.ReLU(inplace=True),
                                        sepConv3d(channelF, 1, 3, (1,1,1),1,bias=True))
 
-        self.up = False
+        self.up = None
         if up:
-            self.up = True
             self.up = nn.Sequential(nn.Upsample(scale_factor=(2,2,2),mode='trilinear'),
                                  sepConv3d(channelF, channelF//2, 3, (1,1,1),1,bias=False),
                                  nn.ReLU(inplace=True))
@@ -110,7 +108,8 @@ class decoderBlock(nn.Module):
                                sepConv3d(channelF, channelF, 1, (1,1,1), 0),
                                sepConv3d(channelF, channelF, 1, (1,1,1), 0),
                                sepConv3d(channelF, channelF, 1, (1,1,1), 0)])
-            
+        else:
+            self.pool_convs = None
  
 
         for m in self.modules():
@@ -132,14 +131,23 @@ class decoderBlock(nn.Module):
         # left
         fvl = self.convs(fvl)
         # pooling
-        if self.pool:
+        if self.pool and self.pool_convs is not None:
             fvl_out = fvl
             _,_,d,h,w=fvl.shape
-            for i,pool_size in enumerate(np.linspace(1,torch.div(min(d,h,w), 2, rounding_mode='floor'),4,dtype=int)):
-                kernel_size = (torch.true_divide(d,pool_size).type(torch.IntTensor), torch.true_divide(h,pool_size).type(torch.IntTensor), torch.true_divide(w,pool_size).type(torch.IntTensor))
+            # # for i,pool_size in enumerate(np.linspace(1,torch.div(min(d,h,w), 2, rounding_mode='floor'),4,dtype=int)):
+            # for i,pool_size in enumerate(torch.linspace(1,torch.div(torch.tensor(min(d,h,w)), 2, rounding_mode='floor').item(),4,dtype=torch.int)):
+            #     kernel_size = [(int)(torch.true_divide(torch.tensor(d),pool_size).type(torch.int).item()), (int)(torch.true_divide(torch.tensor(h),pool_size).type(torch.int).item()), (int)(torch.true_divide(torch.tensor(w),pool_size).type(torch.int).item())]
+            #     out = F.avg_pool3d(fvl, kernel_size, stride=kernel_size)       
+            #     out = self.pool_convs[i](out)
+            #     out = F.upsample(out, size=(d,h,w), mode='trilinear')
+            #     fvl_out = fvl_out + 0.25*out
+            pool_size = torch.linspace(1, torch.div(torch.tensor(min(d,h,w)), 2, rounding_mode='floor').item(), 4, dtype=torch.int)
+            for i, layer in enumerate(self.pool_convs):
+                kernel_size = [(int)(torch.true_divide(torch.tensor(d),pool_size[i]).type(torch.int).item()), (int)(torch.true_divide(torch.tensor(h),pool_size[i]).type(torch.int).item()), (int)(torch.true_divide(torch.tensor(w),pool_size[i]).type(torch.int).item())]
                 out = F.avg_pool3d(fvl, kernel_size, stride=kernel_size)       
-                out = self.pool_convs[i](out)
-                out = F.upsample(out, size=(d,h,w), mode='trilinear')
+                out = layer(out)
+                # out = F.upsample(out, size=(d,h,w), mode='trilinear')
+                out = F.interpolate(out, size=(d,h,w), mode='trilinear')
                 fvl_out = fvl_out + 0.25*out
             fvl = F.relu(fvl_out/2.,inplace=True)
 
@@ -150,11 +158,11 @@ class decoderBlock(nn.Module):
         if self.training:
             # classification
             costl = self.classify(fvl)
-            if self.up:
+            if self.up is not None:
                 fvl = self.up(fvl)
         else:
             # classification
-            if self.up:
+            if self.up is not None:
                 fvl = self.up(fvl)
                 costl=fvl
             else:

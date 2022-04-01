@@ -66,9 +66,19 @@ def load_model(model_path, max_disp, clean, level, cuda=True, data_parallel_mode
 
 
 def trace_model(module, imgL, imgR):
+    print("Creating script module of traced model")
     traced_script_module = None
     with torch.no_grad():
         exampleInput = [imgL, imgR]
         traced_script_module = torch.jit.trace(module, exampleInput)
     return traced_script_module
+
+def create_script_model(module, imgL, imgR):
+    print("Creating script module")
+    script_module = None
+    # with torch.no_grad():
+    # with torch.jit.optimized_execution(True):
+    exampleInput = [imgL, imgR]
+    script_module = torch.jit.script(module, exampleInput)
+    return script_module
 
