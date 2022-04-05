@@ -1,4 +1,4 @@
-#include <torch/script.h> // One-stop header.
+#include <torch/script.h>
 #include <torch/torch.h>
 
 #include <iostream>
@@ -43,15 +43,15 @@ void inputTensorFromImage(const cv::Mat& img, at::Tensor& outTensor, const std::
   tmp.convertTo(tmp, CV_32FC3, 1.0f / 255.0f);
 
   outTensor = torch::from_blob(tmp.data, { 1, tmp.rows, tmp.cols, tmp.channels() }, at::kFloat);
-  /* std::cout << "tensor size: " << out.sizes() << std::endl; */
+  /* std::cout << "tensor size: " << outTensor.sizes() << std::endl; */
   outTensor = outTensor.permute({ 0, 3, 1, 2 });
-  /* std::cout << "tensor size after permute: " << out.sizes() << std::endl; */
+  /* std::cout << "tensor size after permute: " << outTensor.sizes() << std::endl; */
   outTensor = torch::data::transforms::Normalize<>(normMean, normStd)(outTensor);
-  /* std::cout << "tensor size after normalization: " << out.sizes() << std::endl; */
+  /* std::cout << "tensor size after normalization: " << outTensor.sizes() << std::endl; */
 
   outTensor = torch::nn::functional::pad(
       outTensor, torch::nn::functional::PadFuncOptions({ padLeft, 0, padTop, 0 }).mode(torch::kConstant).value(0));
-  /* std::cout << "tensor size after padding: " << out.sizes() << std::endl; */
+  /* std::cout << "tensor size after padding: " << outTensor.sizes() << std::endl; */
 }
 
 void inputBlobFromImage(const cv::Mat& img, cv::Mat& out, const cv::Scalar& normMean, const cv::Scalar& normStd,
@@ -146,6 +146,30 @@ int main(int argc, const char* argv[])
   int topPad = hOut - rescaledImgSize.height;
   int bottomPad = 0;
 
+  torch::NoGradGuard no_grad;
+
+  // warmup
+  for (auto i = 0; i < 2; i++) {
+    cv::Mat lTmp(inputImgSize.height, inputImgSize.width, CV_8UC3, { 0, 0, 0 });
+    cv::Mat rTmp = lTmp.clone();
+    at::Tensor lTensTmp, rTensTmp;
+    inputTensorFromImage(lTmp, lTensTmp, imageNetMean, imageNetStd, leftPad, rightPad, topPad, bottomPad);
+    inputTensorFromImage(rTmp, rTensTmp, imageNetMean, imageNetStd, leftPad, rightPad, topPad, bottomPad);
+    lTensTmp = lTensTmp.to(targetDevice);
+    rTensTmp = rTensTmp.to(targetDevice);
+
+    double processingTime;
+    if (targetDevice == torch::kCUDA)
+      torch::cuda::synchronize();
+    auto start = std::chrono::high_resolution_clock::now();
+    model.forward({ lTensTmp, rTensTmp });
+    if (targetDevice == torch::kCUDA)
+      torch::cuda::synchronize();
+    auto stop = std::chrono::high_resolution_clock::now();
+    processingTime = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+    std::cout << "Warm up - run " << i << " - Runtime: " << processingTime << std::endl;
+  }
+
   at::Tensor tensorLeftImg, tensorRightImg;
 
   std::cout << "Prepare image left:" << std::endl;
@@ -181,10 +205,13 @@ int main(int argc, const char* argv[])
   tensorLeftImg = tensorLeftImg.to(targetDevice);
   tensorRightImg = tensorRightImg.to(targetDevice);
 
-  torch::NoGradGuard no_grad;
   double processingTime;
+  if (targetDevice == torch::kCUDA)
+    torch::cuda::synchronize();
   auto start = std::chrono::high_resolution_clock::now();
   auto result = model.forward({ tensorLeftImg, tensorRightImg }).toTuple();
+  if (targetDevice == torch::kCUDA)
+    torch::cuda::synchronize();
   auto stop = std::chrono::high_resolution_clock::now();
   processingTime = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
   std::cout << "Runtime: " << processingTime << std::endl;

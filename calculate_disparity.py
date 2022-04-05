@@ -72,7 +72,7 @@ def main():
 
     # run model inference and measure time
     print("run inference:")
-    pred_disp, entropy, ttime = perform_inference(model, imgL, imgR, run_cuda)
+    pred_disp, entropy, _ = perform_inference(model, imgL, imgR, run_cuda)
 
     pred_disp = torch.squeeze(pred_disp).data.cpu().numpy()
     top_pad   = img_size_net_in[0]-img_size_in[0]

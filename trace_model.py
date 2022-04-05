@@ -93,7 +93,7 @@ def main():
     print("traced model - run 1:")
     perform_inference(traced_model, imgL, imgR, run_cuda)
     print("traced model - run 2:")
-    pred_disp, entropy, ttime = perform_inference(traced_model, imgL, imgR, run_cuda)
+    pred_disp, entropy, _ = perform_inference(traced_model, imgL, imgR, run_cuda)
 
     print("Resulting disparities are the same: " + str(torch.allclose(pred_disp_m, pred_disp, rtol=1e-4, atol=1e-4, equal_nan=True)))
     print("Resulting entropies are the same: " + str(torch.allclose(entropy_m, entropy, rtol=1e-4, atol=1e-4, equal_nan=True)))
