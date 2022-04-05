@@ -133,7 +133,7 @@ int main(int argc, const char* argv[])
     cv::resize(rightImg, rightImg, cv::Size(), resolutionScale, resolutionScale, cv::InterpolationFlags::INTER_CUBIC);
   }
   cv::Size rescaledImgSize(leftImg.cols, leftImg.rows);
-  std::cout << "size after rescale: " << rescaledImgSize << std::endl;
+  /* std::cout << "size after rescale: " << rescaledImgSize << std::endl; */
 
   int hOut = floorDivide(rescaledImgSize.height, 64.0f) * 64;
   int wOut = floorDivide(rescaledImgSize.width, 64.0f) * 64;
@@ -150,7 +150,7 @@ int main(int argc, const char* argv[])
 
   // warmup
   for (auto i = 0; i < 2; i++) {
-    cv::Mat lTmp(inputImgSize.height, inputImgSize.width, CV_8UC3, { 0, 0, 0 });
+    cv::Mat lTmp(rescaledImgSize.height, rescaledImgSize.width, CV_8UC3, { 0, 0, 0 });
     cv::Mat rTmp = lTmp.clone();
     at::Tensor lTensTmp, rTensTmp;
     inputTensorFromImage(lTmp, lTensTmp, imageNetMean, imageNetStd, leftPad, rightPad, topPad, bottomPad);
