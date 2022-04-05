@@ -71,7 +71,7 @@ def main():
 
     # trace model and save it
     traced_script_module = trace_model(module, imgL, imgR)
-    traced_script_name = 'traced_highresnet-%s-%s-max_disp_%s-clean_%s-level_%s.pt'% (('cuda' if run_cuda else 'cpu'), args.outfilename, module.maxdisp, args.clean, args.level)
+    traced_script_name = 'traced_highresnet_script-%s-%s-max_disp_%s-clean_%s-level_%s.pt'% (('cuda' if run_cuda else 'cpu'), args.outfilename, module.maxdisp, args.clean, args.level)
     if not os.path.exists(args.outdir):
         os.makedirs(args.outdir)
     traced_script_module.save('%s/%s'%(args.outdir, traced_script_name))
