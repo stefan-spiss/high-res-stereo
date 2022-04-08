@@ -4,9 +4,6 @@ import torch.nn as nn
 import torch.utils.data
 import torch.nn.functional as F
 import math
-import numpy as np
-import pdb
-
 
 class sepConv3dBlock(nn.Module):
     '''
@@ -29,8 +26,6 @@ class sepConv3dBlock(nn.Module):
             x = self.downsample(x)
         out = F.relu(x + self.conv2(out),inplace=True)
         return out
-
-
 
 
 class projfeat3d(nn.Module):
@@ -57,20 +52,18 @@ def sepConv3d(in_planes, out_planes, kernel_size, stride, pad,bias=False):
     else:
         return nn.Sequential(nn.Conv3d(in_planes, out_planes, kernel_size=kernel_size, padding=pad, stride=stride,bias=bias),
                          nn.BatchNorm3d(out_planes))
-        
 
-
-    
 
 class disparityregression(nn.Module):
     def __init__(self, maxdisp,divisor):
         super(disparityregression, self).__init__()
         maxdisp = int(maxdisp/divisor)
         #self.disp = torch.Tensor(np.reshape(np.array(range(maxdisp)),[1,maxdisp,1,1])).cuda()
-        self.register_buffer('disp',torch.Tensor(np.reshape(np.array(range(maxdisp)),[1,maxdisp,1,1])))
+        # self.register_buffer('disp', torch.Tensor(np.reshape(np.array(range(maxdisp)),[1,maxdisp,1,1])))
+        self.register_buffer('disp', torch.reshape(torch.arange(0, maxdisp),[1,maxdisp,1,1]))
         self.divisor = divisor
 
-    def forward(self, x,ifent: bool=False):
+    def forward(self, x, ifent: bool=False):
         disp = self.disp.repeat(x.size()[0],1,x.size()[2],x.size()[3])
         out = torch.sum(x*disp,1) * self.divisor
 
@@ -82,11 +75,14 @@ class disparityregression(nn.Module):
         else:
             return out,None
 
+    def set_max_disp(self, maxdisp: int, divisor: int):
+        maxdisp = int(maxdisp/divisor)
+        self.disp = torch.reshape(torch.arange(0, maxdisp),[1,maxdisp,1,1]).type_as(self.disp)
+
 
 class decoderBlock(nn.Module):
-    def __init__(self, nconvs, inchannelF,channelF,stride=(1,1,1),up=False, nstride=1,pool=False):
+    def __init__(self, nconvs, inchannelF, channelF, stride=(1,1,1), up=False, nstride=1, pool=False):
         super(decoderBlock, self).__init__()
-        self.pool=pool
         stride = [stride]*nstride + [(1,1,1)] * (nconvs-nstride)
         self.convs = [sepConv3dBlock(inchannelF,channelF,stride=stride[0])]
         for i in range(1,nconvs):
@@ -97,12 +93,15 @@ class decoderBlock(nn.Module):
                                        nn.ReLU(inplace=True),
                                        sepConv3d(channelF, 1, 3, (1,1,1),1,bias=True))
 
-        self.up = None
+        self.up_used = up
         if up:
             self.up = nn.Sequential(nn.Upsample(scale_factor=(2,2,2),mode='trilinear'),
                                  sepConv3d(channelF, channelF//2, 3, (1,1,1),1,bias=False),
                                  nn.ReLU(inplace=True))
+        else:
+            self.up = None
 
+        self.pool=pool
         if pool:
             self.pool_convs = torch.nn.ModuleList([sepConv3d(channelF, channelF, 1, (1,1,1), 0),
                                sepConv3d(channelF, channelF, 1, (1,1,1), 0),
@@ -110,7 +109,6 @@ class decoderBlock(nn.Module):
                                sepConv3d(channelF, channelF, 1, (1,1,1), 0)])
         else:
             self.pool_convs = None
- 
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -126,6 +124,12 @@ class decoderBlock(nn.Module):
             #    m.running_mean.data.fill_(0)
             #    m.running_var.data.fill_(1)
 
+    def set_up(self, up: bool):
+        if self.up is not None:
+            self.up_used = up
+        else:
+            self.up_used = False
+        return self.up_used
 
     def forward(self,fvl):
         # left
@@ -162,7 +166,7 @@ class decoderBlock(nn.Module):
                 fvl = self.up(fvl)
         else:
             # classification
-            if self.up is not None:
+            if self.up_used and self.up is not None:
                 fvl = self.up(fvl)
                 costl=fvl
             else:

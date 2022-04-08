@@ -52,7 +52,7 @@ def main():
     else:
         run_cuda = False
     
-    model, _, _ = load_model(model_path=args.modelpath, max_disp=args.maxdisp, clean=args.clean, level=args.level, cuda=run_cuda, data_parallel_model=args.dataparallelmodel)
+    model, _, _ = load_model(model_path=args.modelpath, max_disp=args.maxdisp, clean=args.clean, cuda=run_cuda, data_parallel_model=args.dataparallelmodel)
     model.eval()
 
     if run_cuda:
@@ -60,8 +60,12 @@ def main():
     else:
         module = model
 
+    if args.level != 1:
+        level, changed = module.set_level(args.level)
+        print(('level set to ' + str(level)) if changed else ('could not change level ' + str(level)))
+
     # load images
-    imgL, imgR, img_size_in, img_size_net_in = load_image_pair(left_input_img, right_input_img, args.resscale)
+    imgL, imgR, img_size_in, img_size_in_scaled, img_size_net_in = load_image_pair(left_input_img, right_input_img, args.resscale)
 
     if run_cuda:
         imgL = Variable(torch.FloatTensor(imgL).cuda())
@@ -73,10 +77,11 @@ def main():
     # run model inference and measure time
     print("run inference:")
     pred_disp, entropy, _ = perform_inference(model, imgL, imgR, run_cuda)
+    pred_disp, entropy, _ = perform_inference(model, imgL, imgR, run_cuda)
 
     pred_disp = torch.squeeze(pred_disp).data.cpu().numpy()
-    top_pad   = img_size_net_in[0]-img_size_in[0]
-    left_pad  = img_size_net_in[1]-img_size_in[1]
+    top_pad   = img_size_net_in[0]-img_size_in_scaled[0]
+    left_pad  = img_size_net_in[1]-img_size_in_scaled[1]
     entropy = entropy[top_pad:,:pred_disp.shape[1]-left_pad].cpu().numpy()
     pred_disp = pred_disp[top_pad:,:pred_disp.shape[1]-left_pad]
 

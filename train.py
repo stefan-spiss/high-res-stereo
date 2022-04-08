@@ -37,7 +37,7 @@ parser.add_argument('--seed', type=int, default=1, metavar='S',
 args = parser.parse_args()
 torch.manual_seed(args.seed)
 
-model = hsm(args.maxdisp,clean=False,level=1)
+model = hsm(args.maxdisp,clean=-1.0)
 model = nn.DataParallel(model)
 model.cuda()
 

@@ -33,7 +33,7 @@ def main():
                         help='resolution scale')
     parser.add_argument('--level', type=int, default=1,
                         help='output level of output, default is level 1 (stage 3),\
-                              can also use level 2 (stage 2) or level 3 (stage 1)')
+                              can also use level 2 (stage 2) or level 3 (stage 1), only affects the inference, scripting uses level 1.')
     parser.add_argument('--cuda', default=True, action=argparse.BooleanOptionalAction,
                         help='use cuda if available')
     parser.add_argument('--saveoutputimgs', default=False, action=argparse.BooleanOptionalAction,
@@ -49,7 +49,7 @@ def main():
     else:
         run_cuda = False
     
-    model, _, _ = load_model(model_path=args.modelpath, max_disp=args.maxdisp, clean=args.clean, level=args.level, cuda=run_cuda)
+    model, _, _ = load_model(model_path=args.modelpath, max_disp=args.maxdisp, clean=args.clean, cuda=run_cuda)
     model.eval()
 
     if run_cuda:
@@ -58,7 +58,7 @@ def main():
         module = model
 
     # load images
-    imgL, imgR, img_size_in, img_size_net_in = load_image_pair(left_input_img, right_input_img, args.resscale)
+    imgL, imgR, img_size_in, img_size_in_scaled, img_size_net_in = load_image_pair(left_input_img, right_input_img, args.resscale)
 
     if run_cuda:
         imgL = torch.FloatTensor(imgL).cuda()
@@ -69,7 +69,7 @@ def main():
 
 
     script_module = create_script_model(module, imgL, imgR)
-    script_module_name = 'highresnet_script-%s-%s-max_disp_%s-clean_%s-level_%s.pt'% (('cuda' if run_cuda else 'cpu'), args.outfilename, module.maxdisp, args.clean, args.level)
+    script_module_name = 'highresnet_script-%s-%s.pt'% (('cuda' if run_cuda else 'cpu'), args.outfilename)
     if not os.path.exists(args.outdir):
         os.makedirs(args.outdir)
     script_module.save('%s/%s'%(args.outdir, script_module_name))
@@ -84,8 +84,10 @@ def main():
     if run_cuda:
         script_model = nn.DataParallel(script_model, device_ids=[0])
         script_model.cuda().eval()
+        script_model.module.set_level(args.level)
     else:
         script_model.eval()
+        script_model.set_level(args.level)
 
     print("scripted model - run 1:")
     perform_inference(script_model, imgL, imgR, run_cuda)
@@ -98,8 +100,8 @@ def main():
     print("Resulting entropies are the same: " + str(torch.allclose(entropy_m, entropy, rtol=1e-4, atol=1e-4, equal_nan=True)))
 
     pred_disp = torch.squeeze(pred_disp).data.cpu().numpy()
-    top_pad   = img_size_net_in[0]-img_size_in[0]
-    left_pad  = img_size_net_in[1]-img_size_in[1]
+    top_pad   = img_size_net_in[0]-img_size_in_scaled[0]
+    left_pad  = img_size_net_in[1]-img_size_in_scaled[1]
     entropy = entropy[top_pad:,:pred_disp.shape[1]-left_pad].cpu().numpy()
     pred_disp = pred_disp[top_pad:,:pred_disp.shape[1]-left_pad]
 

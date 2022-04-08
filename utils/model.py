@@ -3,9 +3,9 @@ import torch
 import torch.nn as nn
 from models.submodule import *
 
-def load_model(model_path, max_disp, clean, level, cuda=True, data_parallel_model=False):
+def load_model(model_path, max_disp, clean, cuda=True, data_parallel_model=False):
     # construct model
-    model = hsm(max_disp,clean,level=level)
+    model = hsm(max_disp, clean=clean)
     device = None
     if cuda:
         device = torch.device('cuda')
@@ -33,35 +33,6 @@ def load_model(model_path, max_disp, clean, level, cuda=True, data_parallel_mode
         else:
             model.cpu()
 
-    if max_disp>0:
-        max_disp = int(max_disp)
-    else:
-        max_disp = int(128)
-
-    if cuda:
-        module = model.module
-    else:
-        module = model
-
-    ## change max disp
-    tmpdisp = int(max_disp//64*64)
-    if (max_disp/64*64) > tmpdisp:
-        module.maxdisp = tmpdisp + 64
-    else:
-        module.maxdisp = tmpdisp
-    if module.maxdisp == 64: module.maxdisp=128
-    
-    if cuda:
-        module.disp_reg8 =  disparityregression(module.maxdisp,16).cuda()
-        module.disp_reg16 = disparityregression(module.maxdisp,16).cuda()
-        module.disp_reg32 = disparityregression(module.maxdisp,32).cuda()
-        module.disp_reg64 = disparityregression(module.maxdisp,64).cuda()
-    else:
-        module.disp_reg8 =  disparityregression(module.maxdisp,16)
-        module.disp_reg16 = disparityregression(module.maxdisp,16)
-        module.disp_reg32 = disparityregression(module.maxdisp,32)
-        module.disp_reg64 = disparityregression(module.maxdisp,64)
-
     return model, device, pretrained_dict
 
 
@@ -69,8 +40,10 @@ def trace_model(module, imgL, imgR):
     print("Creating script module of traced model")
     traced_script_module = None
     with torch.no_grad():
-        exampleInput = [imgL, imgR]
-        traced_script_module = torch.jit.trace(module, exampleInput)
+        exampleInput = (imgL, imgR)
+        # there is an error with the graphs being different if check_trace is True, not sure what's the problem -> check
+        # disabled
+        traced_script_module = torch.jit.trace(module, example_inputs=exampleInput, optimize=True, check_trace=False)
     return traced_script_module
 
 def create_script_model(module, imgL, imgR):
@@ -78,7 +51,7 @@ def create_script_model(module, imgL, imgR):
     script_module = None
     # with torch.no_grad():
     # with torch.jit.optimized_execution(True):
-    exampleInput = [imgL, imgR]
-    script_module = torch.jit.script(module, exampleInput)
+    exampleInput = [(imgL, imgR)]
+    script_module = torch.jit.script(module, optimize=True, example_inputs=exampleInput)
     return script_module
 

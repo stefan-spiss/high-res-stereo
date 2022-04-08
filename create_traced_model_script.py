@@ -49,7 +49,7 @@ def main():
     else:
         run_cuda = False
     
-    model, _, _ = load_model(model_path=args.modelpath, max_disp=args.maxdisp, clean=args.clean, level=args.level, cuda=run_cuda)
+    model, _, _ = load_model(model_path=args.modelpath, max_disp=args.maxdisp, clean=args.clean, cuda=run_cuda)
     model.eval()
 
     if run_cuda:
@@ -57,8 +57,10 @@ def main():
     else:
         module = model
 
+    module.set_level(args.level)
+
     # load images
-    imgL, imgR, img_size_in, img_size_net_in = load_image_pair(left_input_img, right_input_img, args.resscale)
+    imgL, imgR, img_size_in, img_size_in_scaled, img_size_net_in = load_image_pair(left_input_img, right_input_img, args.resscale)
 
     if run_cuda:
         imgL = torch.FloatTensor(imgL).cuda()
@@ -70,7 +72,7 @@ def main():
 
     # trace model and save it
     traced_script_module = trace_model(module, imgL, imgR)
-    traced_script_name = 'traced_highresnet_script-%s-%s-max_disp_%s-clean_%s-level_%s.pt'% (('cuda' if run_cuda else 'cpu'), args.outfilename, module.maxdisp, args.clean, args.level)
+    traced_script_name = 'traced_highresnet_script-%s-%s-h_%s-w_%s-max_disp_%s-clean_%s-level_%s.pt'% (('cuda' if run_cuda else 'cpu'), args.outfilename, img_size_net_in[0], img_size_net_in[1], module.maxdisp, args.clean, args.level)
     if not os.path.exists(args.outdir):
         os.makedirs(args.outdir)
     traced_script_module.save('%s/%s'%(args.outdir, traced_script_name))
@@ -98,8 +100,8 @@ def main():
     print("Resulting entropies are the same: " + str(torch.allclose(entropy_m, entropy, rtol=1e-4, atol=1e-4, equal_nan=True)))
 
     pred_disp = torch.squeeze(pred_disp).data.cpu().numpy()
-    top_pad   = img_size_net_in[0]-img_size_in[0]
-    left_pad  = img_size_net_in[1]-img_size_in[1]
+    top_pad   = img_size_net_in[0]-img_size_in_scaled[0]
+    left_pad  = img_size_net_in[1]-img_size_in_scaled[1]
     entropy = entropy[top_pad:,:pred_disp.shape[1]-left_pad].cpu().numpy()
     pred_disp = pred_disp[top_pad:,:pred_disp.shape[1]-left_pad]
 

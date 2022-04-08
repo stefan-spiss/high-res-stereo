@@ -19,7 +19,7 @@ def main():
                         help='output dir')
     args = parser.parse_args()
     
-    model, _, pretrained_dict = load_model(args.modelpath, max_disp=128, clean=1, level=1, cuda=True, data_parallel_model=True)
+    model, _, pretrained_dict = load_model(args.modelpath, max_disp=128, clean=-1.0, cuda=True, data_parallel_model=True)
 
     # dry run
     multip = 48

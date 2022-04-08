@@ -26,6 +26,9 @@ def load_image_pair(left_img_path, right_img_path, scale_factor):
     # resize
     imgL_o = cv2.resize(imgL_o,None,fx=scale_factor,fy=scale_factor,interpolation=cv2.INTER_CUBIC)
     imgR_o = cv2.resize(imgR_o,None,fx=scale_factor,fy=scale_factor,interpolation=cv2.INTER_CUBIC)
+
+    input_img_size_scaled = imgL_o.shape[:2]
+
     imgL = processed(imgL_o).numpy()
     imgR = processed(imgR_o).numpy()
 
@@ -43,7 +46,7 @@ def load_image_pair(left_img_path, right_img_path, scale_factor):
     imgL = np.lib.pad(imgL,((0,0),(0,0),(top_pad,0),(0,left_pad)),mode='constant',constant_values=0)
     imgR = np.lib.pad(imgR,((0,0),(0,0),(top_pad,0),(0,left_pad)),mode='constant',constant_values=0)
 
-    return imgL, imgR, input_img_size, (h_img_net_in, w_img_net_in)
+    return imgL, imgR, input_img_size, input_img_size_scaled, (h_img_net_in, w_img_net_in)
 
 
 def perform_inference(model, imgL, imgR, cuda):
@@ -53,7 +56,7 @@ def perform_inference(model, imgL, imgR, cuda):
         if cuda:
             torch.cuda.synchronize()
         start_time = time.time()
-        pred_disp,entropy = model(imgL,imgR)
+        pred_disp, entropy = model(imgL, imgR)
         if cuda:
             torch.cuda.synchronize()
         ttime = (time.time() - start_time); print('runtime = %.2f' % (ttime*1000) )

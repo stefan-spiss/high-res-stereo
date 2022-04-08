@@ -42,7 +42,7 @@ from dataloader import listfiles as DA
 test_left_img, test_right_img, _, _ = DA.dataloader(args.datapath)
 
 # construct model
-model = hsm(128,args.clean,level=args.level)
+model = hsm(128, clean=args.clean)
 model = nn.DataParallel(model, device_ids=[0])
 model.cuda()
 
@@ -62,11 +62,13 @@ imgL = Variable(torch.FloatTensor(imgL).cuda())
 imgR = Variable(torch.FloatTensor(imgR).cuda())
 with torch.no_grad():
     model.eval()
+    model.module.set_level(args.level)
     pred_disp,entropy = model(imgL,imgR)
 
 def main():
     processed = get_transform()
     model.eval()
+    model.module.set_level(args.level)
     for inx in range(len(test_left_img)):
         print(test_left_img[inx])
         imgL_o = (skimage.io.imread(test_left_img[inx]).astype('float32'))[:,:,:3]

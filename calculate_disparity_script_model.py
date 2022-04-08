@@ -1,14 +1,10 @@
 import argparse
 import cv2
 import numpy as np
-import os
 import torch
-import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
-from utils.model import load_model
 from utils.inference import *
-from models.submodule import *
 from utils.eval import save_pfm
 #cudnn.benchmark = True
 cudnn.benchmark = False
@@ -26,8 +22,15 @@ def main():
                         help='output dir')
     parser.add_argument('--outfilename', default='output',
                         help='output file name')
+    parser.add_argument('--maxdisp', type=int, default=None,
+                        help='maximum disparity to search for, should be None or disparity used during tracing if model was created from tracing')
+    parser.add_argument('--clean', type=float, default=None,
+                        help='clean up output using entropy estimation, needs to be None if model was created from tracing')
     parser.add_argument('--resscale', type=float, default=1.0,
                         help='resolution scale')
+    parser.add_argument('--level', type=int, default=1,
+                        help='level of output, default is level 1 (stage 3),\
+                              can also use level 2 (stage 2) or level 3 (stage 1), needs to be None if model was created from tracing')
     parser.add_argument('--cuda', default=True, action=argparse.BooleanOptionalAction,
                         help='use cuda if available')
     parser.add_argument('--saveoutputimgs', default=False, action=argparse.BooleanOptionalAction,
@@ -47,14 +50,25 @@ def main():
     
     model = torch.jit.load(args.modelpath, map_location=device)
 
+    if args.maxdisp:
+        model.set_max_disp(args.maxdisp)
+
+    if args.clean:
+        model.set_clean(args.clean)
+
     if run_cuda:
         # model = nn.DataParallel(model, device_ids=[0])
         model.cuda().eval()
     else:
         model.eval()
 
+    if args.clean:
+        model.set_clean(args.clean)
+    if args.level:
+        model.set_level(args.level)
+
     # load images
-    imgL, imgR, img_size_in, img_size_net_in = load_image_pair(left_input_img, right_input_img, args.resscale)
+    imgL, imgR, img_size_in, img_size_in_scaled, img_size_net_in = load_image_pair(left_input_img, right_input_img, args.resscale)
 
     if run_cuda:
         imgL = Variable(torch.FloatTensor(imgL).cuda())
@@ -74,11 +88,11 @@ def main():
     print("traced model - run 3:")
     pred_disp, entropy, _ = perform_inference(model, imgL, imgR, run_cuda)
 
-    print("traced model - run 3:")
+    print("traced model - run 4:")
     pred_disp, entropy, _ = perform_inference(model, imgL, imgR, run_cuda)
 
     # load images
-    imgL, imgR, img_size_in, img_size_net_in = load_image_pair(left_input_img, right_input_img, args.resscale)
+    imgL, imgR, img_size_in, img_size_in_scaled, img_size_net_in = load_image_pair(left_input_img, right_input_img, args.resscale)
 
     if run_cuda:
         imgL = Variable(torch.FloatTensor(imgL).cuda())
@@ -87,12 +101,12 @@ def main():
         imgL = Variable(torch.FloatTensor(imgL))
         imgR = Variable(torch.FloatTensor(imgR))
 
-    print("traced model - run 3:")
+    print("traced model - run 5:")
     pred_disp, entropy, _ = perform_inference(model, imgL, imgR, run_cuda)
 
     pred_disp = torch.squeeze(pred_disp).data.cpu().numpy()
-    top_pad   = img_size_net_in[0]-img_size_in[0]
-    left_pad  = img_size_net_in[1]-img_size_in[1]
+    top_pad   = img_size_net_in[0]-img_size_in_scaled[0]
+    left_pad  = img_size_net_in[1]-img_size_in_scaled[1]
     entropy = entropy[top_pad:,:pred_disp.shape[1]-left_pad].cpu().numpy()
     pred_disp = pred_disp[top_pad:,:pred_disp.shape[1]-left_pad]
 
