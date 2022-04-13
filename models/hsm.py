@@ -68,20 +68,20 @@ class HSMNet(nn.Module):
     
     @torch.jit.export
     def set_max_disp(self, maxdisp: int):
-        new_maxdisp = int(maxdisp//64*64)
-        if (maxdisp/64*64) > new_maxdisp:
-            new_maxdisp = new_maxdisp + 64
-        if new_maxdisp == 64: new_maxdisp=128
-
         updated = False
+        if maxdisp > 0:
+            new_maxdisp = int(maxdisp//64*64)
+            if (maxdisp/64*64) > new_maxdisp:
+                new_maxdisp = new_maxdisp + 64
+            if new_maxdisp == 64: new_maxdisp=128
 
-        if self.maxdisp != new_maxdisp:
-            self.maxdisp = new_maxdisp
-            self.disp_reg8.set_max_disp(self.maxdisp, 16)
-            self.disp_reg16.set_max_disp(self.maxdisp, 16)
-            self.disp_reg32.set_max_disp(self.maxdisp, 32)
-            self.disp_reg64.set_max_disp(self.maxdisp, 64)
-            updated = True
+            if self.maxdisp != new_maxdisp:
+                self.maxdisp = new_maxdisp
+                self.disp_reg8.set_max_disp(self.maxdisp, 16)
+                self.disp_reg16.set_max_disp(self.maxdisp, 16)
+                self.disp_reg32.set_max_disp(self.maxdisp, 32)
+                self.disp_reg64.set_max_disp(self.maxdisp, 64)
+                updated = True
         return self.maxdisp, updated
 
     @torch.jit.export
@@ -95,32 +95,28 @@ class HSMNet(nn.Module):
     @torch.jit.export
     def set_level(self, level: int):
         updated = False
-        if level != self.level:
+        if level <= 3 and level >= 1:
             # training only possible of all levels, also scripting requires all levels to be available
             if self.training:
                 self.level = 1
 
-            if level > 3:
-                level = 3
-            elif level < 1:
-                level = 1
-
-            if level > 2:
-               self.decoder5.set_up(False)
-               updated = True
-            else:
-                up5 = self.decoder5.up_used
-                if self.decoder5.set_up(True):
-                    if level > 1:
-                        self.decoder4.set_up(False)
-                        updated = True
-                    else:
-                        if self.decoder4.set_up(True):
+            if level != self.level:
+                if level > 2:
+                   self.decoder5.set_up(False)
+                   updated = True
+                else:
+                    up5 = self.decoder5.up_used
+                    if self.decoder5.set_up(True):
+                        if level > 1:
+                            self.decoder4.set_up(False)
                             updated = True
                         else:
-                            self.decoder5.set_up(up5)
-            if updated:
-                self.level = level
+                            if self.decoder4.set_up(True):
+                                updated = True
+                            else:
+                                self.decoder5.set_up(up5)
+                if updated:
+                    self.level = level
         return self.level, updated
 
     def forward(self, left, right):

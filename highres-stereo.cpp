@@ -80,7 +80,10 @@ int main(int argc, const char* argv[])
                            "{@model              |<none>|path to traced model file (.pt)}"
                            "{@leftImage          |<none>|path to input image (.png, .jpg, ...)}"
                            "{@rightImage         |<none>|path to input image (.png, .jpg, ...)}"
+                           "{clean               |-1.0  |entropy threshold to be used for cleaning (filtering) the disparity, < 0.0: no cleaning}"
                            "{cuda                |true  |if true, cuda is used when possible, otherwise cpu}"
+                           "{level               |1     |level of decoder network to use as output (level 1: highest resolution, level 3: lowest resolution)}"
+                           "{maxDisp             |-1    |maximum disparity, if -1, default value of model is used)}"
                            "{resScale            |1.0   |output resolution multiplier}";
   cv::CommandLineParser parser(argc, argv, keys);
 
@@ -92,7 +95,10 @@ int main(int argc, const char* argv[])
   std::string modelFilePath = parser.get<std::string>(0);
   std::string imageFilePathLeft = parser.get<std::string>(1);
   std::string imageFilePathRight = parser.get<std::string>(2);
+  float clean = parser.get<float>("clean");
   bool runCuda = parser.get<bool>("cuda");
+  int level = parser.get<int>("level");
+  int maxDisp = parser.get<int>("maxDisp");
   float resolutionScale = parser.get<float>("resScale");
 
   if (!parser.check()) {
@@ -116,6 +122,22 @@ int main(int argc, const char* argv[])
   } catch (const c10::Error& e) {
     std::cerr << "error loading the model\n";
     return -1;
+  }
+
+  std::cout << "clean set to: " << model.run_method("set_clean", clean) << std::endl;
+
+  auto levelRet = model.run_method("set_level", level).toTuple();
+  if (levelRet->elements()[1].toBool()) {
+    std::cout << "level set to: " << levelRet->elements()[0] << std::endl;
+  } else {
+    std::cout << "level not updated: " << levelRet->elements()[0] << std::endl;
+  }
+
+  auto maxDispRet = model.run_method("set_max_disp", maxDisp).toTuple();
+  if (maxDispRet->elements()[1].toBool()) {
+    std::cout << "maximum disparity set to: " << maxDispRet->elements()[0] << std::endl;
+  } else {
+    std::cout << "maximum disparity not updated: " << maxDispRet->elements()[0] << std::endl;
   }
 
   cv::Mat leftImg = cv::imread(imageFilePathLeft, cv::IMREAD_COLOR);
