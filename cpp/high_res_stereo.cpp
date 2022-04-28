@@ -14,14 +14,14 @@ HighResStereoMatcher::HighResStereoMatcher(const std::string& model_path, const 
     , set_max_disp_(std::nullopt)
     , traced_(traced)
 {
-    if (target_device.type() == torch::kCUDA && torch::cuda::is_available()) {
-        target_device_ = target_device;
-    } else {
+    if (target_device.type() == torch::kCUDA && !torch::cuda::is_available()) {
         utils::PrintError("CUDA device chosen, but CUDA not available -> target device set to CPU" + model_path,
             __func__, __FILE__, __LINE__);
         /* auto loc = std::source_location::current(); */
         /* PrintError("CUDA device chosen, but CUDA not available -> target device set to CPU", loc.function_name(),
          * loc.file_name(), loc.line()); */
+    } else {
+        target_device_ = target_device;
     }
     try {
         model_ = torch::jit::load(model_path, target_device_);
