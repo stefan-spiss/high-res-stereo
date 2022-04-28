@@ -78,6 +78,7 @@ class disparityregression(nn.Module):
     def set_max_disp(self, maxdisp: int, divisor: int):
         maxdisp = int(maxdisp/divisor)
         self.disp = torch.reshape(torch.arange(0, maxdisp),[1,maxdisp,1,1]).type_as(self.disp)
+        self.divisor = divisor
 
 
 class decoderBlock(nn.Module):

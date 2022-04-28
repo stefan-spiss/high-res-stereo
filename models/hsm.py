@@ -71,7 +71,7 @@ class HSMNet(nn.Module):
         updated = False
         if maxdisp > 0:
             new_maxdisp = int(maxdisp//64*64)
-            if (maxdisp/64*64) > new_maxdisp:
+            if maxdisp > new_maxdisp:
                 new_maxdisp = new_maxdisp + 64
             if new_maxdisp == 64: new_maxdisp=128
 
@@ -82,7 +82,11 @@ class HSMNet(nn.Module):
                 self.disp_reg32.set_max_disp(self.maxdisp, 32)
                 self.disp_reg64.set_max_disp(self.maxdisp, 64)
                 updated = True
-        return self.maxdisp, updated
+        return updated
+
+    @torch.jit.export
+    def get_max_disp(self):
+        return self.maxdisp
 
     @torch.jit.export
     def set_clean(self, clean: float):
@@ -90,13 +94,16 @@ class HSMNet(nn.Module):
             self.clean = -1.0
         else:
             self.clean = clean
+
+    @torch.jit.export
+    def get_clean(self):
         return self.clean
 
     @torch.jit.export
     def set_level(self, level: int):
         updated = False
         if level <= 3 and level >= 1:
-            # training only possible of all levels, also scripting requires all levels to be available
+            # training only possible with all levels, also scripting requires all levels to be available
             if self.training:
                 self.level = 1
 
@@ -117,7 +124,11 @@ class HSMNet(nn.Module):
                                 self.decoder5.set_up(up5)
                 if updated:
                     self.level = level
-        return self.level, updated
+        return updated
+
+    @torch.jit.export
+    def get_level(self):
+        return self.level
 
     def forward(self, left, right):
         nsample = left.size()[0]
