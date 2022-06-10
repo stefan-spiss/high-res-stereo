@@ -6,7 +6,8 @@
 namespace high_res_stereo {
 HighResStereoMatcher::HighResStereoMatcher(const std::string& model_path, const torch::Device& target_device,
     bool traced, const std::array<double, 3>& norm_mean, const std::array<double, 3>& norm_std)
-    : norm_mean_(norm_mean)
+    : model_file_path_(model_path)
+    , norm_mean_(norm_mean)
     , norm_std_(norm_std)
     , target_device_(torch::kCPU)
     , set_clean_(std::nullopt)

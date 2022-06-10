@@ -12,6 +12,8 @@ public:
         bool traced = false, const std::array<double, 3>& norm_mean = { 0.485, 0.456, 0.406 },
         const std::array<double, 3>& norm_std = { 0.229, 0.224, 0.225 });
 
+    inline const std::string& model_file_path() const { return model_file_path_; }
+
     bool set_target_device(const torch::Device& target_device);
     inline const torch::Device& target_device() const { return target_device_; }
 
@@ -71,6 +73,7 @@ public:
         cv::OutputArray entropy = cv::noArray());
 
 private:
+    const std::string model_file_path_;
     const std::array<double, 3> norm_mean_;
     const std::array<double, 3> norm_std_;
 
