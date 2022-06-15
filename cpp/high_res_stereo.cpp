@@ -104,6 +104,7 @@ bool HighResStereoMatcher::WarmUpModel(cv::Size img_size, unsigned int n_runs)
         warmed_up = true;
     } catch (const torch::Error& e) {
         utils::PrintError("Error running warm up for model", __func__, __FILE__, __LINE__, e.what());
+        warmed_up = false;
     }
     return warmed_up;
 }
