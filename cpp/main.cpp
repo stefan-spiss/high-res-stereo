@@ -57,6 +57,8 @@ int main(int argc, const char* argv[])
         return 0;
     }
 
+    std::cout << "device: " << (run_cuda ? "cuda" : "cpu") << std::endl;
+
     high_res_stereo::HighResStereoMatcher stereo_matcher(model_file_path,
         run_cuda ? torch::Device(torch::kCUDA) : torch::Device(torch::kCPU), traced, image_net_mean, image_net_std);
 

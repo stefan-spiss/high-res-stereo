@@ -17,7 +17,7 @@ find_package(TBB REQUIRED)
 
 add_subdirectory(cpp)
 
-add_executable(highres-stereo highres-stereo.cpp)
-target_link_libraries(highres-stereo "${TORCH_LIBRARIES}")
-target_link_libraries(highres-stereo ${OpenCV_LIBS})
-target_link_libraries(highres-stereo TBB::tbb)
+add_executable(highres-stereo-no-lib EXCLUDE_FROM_ALL highres-stereo.cpp)
+target_link_libraries(highres-stereo-no-lib "${TORCH_LIBRARIES}")
+target_link_libraries(highres-stereo-no-lib ${OpenCV_LIBS})
+target_link_libraries(highres-stereo-no-lib TBB::tbb)
