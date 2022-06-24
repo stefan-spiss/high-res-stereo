@@ -180,8 +180,8 @@ class HSMNet(nn.Module):
                     if entropy is not None:
                         pred3[entropy>self.clean] = torch.inf
 
-            if entropy is not None:
-                entropy = torch.squeeze(entropy)
+            # if entropy is not None:
+            #     entropy = torch.squeeze(entropy)
             return pred3, entropy
         # for pytorch model
         else:
@@ -206,4 +206,5 @@ class HSMNet(nn.Module):
                 stacked = [pred3,pred4,pred5,pred6]   
                 return stacked,entropy
             else:
-                return pred3,torch.squeeze(entropy)
+                # return pred3,torch.squeeze(entropy)
+                return pred3, entropy

@@ -100,10 +100,11 @@ def main():
     print("Resulting entropies are the same: " + str(torch.allclose(entropy_m, entropy, rtol=1e-4, atol=1e-4, equal_nan=True)))
 
     pred_disp = torch.squeeze(pred_disp).data.cpu().numpy()
+    entropy = torch.squeeze(entropy).data.cpu().numpy()
     top_pad   = img_size_net_in[0]-img_size_in_scaled[0]
     left_pad  = img_size_net_in[1]-img_size_in_scaled[1]
-    entropy = entropy[top_pad:,:pred_disp.shape[1]-left_pad].cpu().numpy()
     pred_disp = pred_disp[top_pad:,:pred_disp.shape[1]-left_pad]
+    entropy = entropy[top_pad:,:pred_disp.shape[1]-left_pad]
 
     # resize to highres
     pred_disp = cv2.resize(pred_disp/args.resscale,(img_size_in[1],img_size_in[0]),interpolation=cv2.INTER_LINEAR)

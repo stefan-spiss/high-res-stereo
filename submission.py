@@ -127,10 +127,11 @@ def main():
             torch.cuda.synchronize()
             ttime = (time.time() - start_time); print('time = %.2f' % (ttime*1000) )
         pred_disp = torch.squeeze(pred_disp).data.cpu().numpy()
+        entropy = torch.squeeze(entropy).data.cpu().numpy()
 
         top_pad   = max_h-imgL_o.shape[0]
         left_pad  = max_w-imgL_o.shape[1]
-        entropy = entropy[top_pad:,:pred_disp.shape[1]-left_pad].cpu().numpy()
+        entropy = entropy[top_pad:,:pred_disp.shape[1]-left_pad]
         pred_disp = pred_disp[top_pad:,:pred_disp.shape[1]-left_pad]
 
         # save predictions
