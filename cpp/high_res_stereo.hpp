@@ -72,6 +72,9 @@ public:
     void CalculateDisparity(cv::InputArray img_left, cv::InputArray img_right, cv::OutputArray disparity,
         cv::OutputArray entropy = cv::noArray());
 
+    void CalculateDisparities(cv::InputArrayOfArrays imgs_left, cv::InputArrayOfArrays imgs_right, cv::OutputArrayOfArrays disparities,
+        cv::OutputArrayOfArrays entropies = cv::noArray());
+
 private:
     const std::string model_file_path_;
     const std::array<double, 3> norm_mean_;
