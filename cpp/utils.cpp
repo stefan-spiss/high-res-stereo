@@ -34,13 +34,17 @@ namespace utils {
         return { net_img_size.width - img_size.width, net_img_size.height - img_size.height };
     }
 
-    cv::Mat TorchTensorToCVMat(torch::Tensor& tensor, int rtype, int channels)
+    cv::Mat TorchTensorToCVMat(const torch::Tensor& in, int rtype, int channels, const int pad_left, const int pad_top)
     {
-        tensor = tensor.squeeze().detach();
-        if (channels == 3)
-            tensor = tensor.permute({ 1, 2, 0 }).contiguous().to(torch::kCPU);
-        else if (channels == 1)
-            tensor = tensor.contiguous().to(torch::kCPU);
+        auto tensor = in.squeeze().detach();
+        // used to remove padding added during generation of tensor from cv mats (pad_left and pad_top need to be
+        // negative)
+        tensor = torch::nn::functional::pad(
+            tensor, torch::nn::functional::PadFuncOptions({ pad_left, 0, pad_top, 0 }).mode(torch::kConstant).value(0));
+        if (channels == 3) {
+            tensor = tensor.permute({ 1, 2, 0 });
+        }
+        tensor = tensor.contiguous().to(torch::kCPU, tensor.dtype(), false, true);
         return cv::Mat(tensor.size(0), tensor.size(1), rtype, tensor.data_ptr()).clone();
     }
 
@@ -52,16 +56,17 @@ namespace utils {
         tmp.convertTo(tmp, CV_32FC3, 1.0f / 255.0f);
 
         out_tensor = torch::from_blob(
-            tmp.data, { 1, tmp.rows, tmp.cols, tmp.channels() }, torch::TensorOptions().dtype(torch::kFloat));
-        /* std::cout << "tensor size: " << outTensor.sizes() << std::endl; */
+            tmp.data, { 1, tmp.rows, tmp.cols, tmp.channels() }, torch::TensorOptions().dtype(torch::kFloat))
+                         .clone();
+        /* std::cout << "tensor size: " << out_tensor.sizes() << std::endl; */
         out_tensor = out_tensor.permute({ 0, 3, 1, 2 });
-        /* std::cout << "tensor size after permute: " << outTensor.sizes() << std::endl; */
+        /* std::cout << "tensor size after permute: " << out_tensor.sizes() << std::endl; */
         out_tensor = torch::data::transforms::Normalize<>(norm_mean, norm_std)(out_tensor);
-        /* std::cout << "tensor size after normalization: " << outTensor.sizes() << std::endl; */
+        /* std::cout << "tensor size after normalization: " << out_tensor.sizes() << std::endl; */
 
         out_tensor = torch::nn::functional::pad(out_tensor,
             torch::nn::functional::PadFuncOptions({ pad_left, 0, pad_top, 0 }).mode(torch::kConstant).value(0));
-        /* std::cout << "tensor size after padding: " << outTensor.sizes() << std::endl; */
+        /* std::cout << "tensor size after padding: " << out_tensor.sizes() << std::endl; */
     }
 
     void InputBlobFromImage(const cv::Mat& img, cv::Mat& out, const cv::Scalar& norm_mean, const cv::Scalar& norm_std,

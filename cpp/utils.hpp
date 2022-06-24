@@ -17,7 +17,7 @@ namespace utils {
 
     cv::Size CalculateNetworkImgSize(const cv::Size& img_size_in);
 
-    cv::Mat TorchTensorToCVMat(torch::Tensor& tensor, int rtype, int channels);
+    cv::Mat TorchTensorToCVMat(const torch::Tensor& in, int rtype, int channels, const int pad_left = 0, const int pad_top = 0);
 
     void InputTensorFromImage(const cv::Mat& img, torch::Tensor& out_tensor, const std::array<double, 3>& norm_mean,
         const std::array<double, 3>& norm_std, const int pad_left = 0, const int pad_top = 0);

@@ -144,8 +144,10 @@ void HighResStereoMatcher::CalculateDisparity(
     auto result = model_.forward({ t_img_l, t_img_r }).toTuple();
 
     auto t_disp = result->elements()[0].toTensor();
-    auto disp = utils::TorchTensorToCVMat(t_disp, CV_32FC1, 1);
-    disp = cv::Mat(disp, cv::Rect(std::get<0>(padding), std::get<1>(padding), img_size.width, img_size.height));
+    auto disp = utils::TorchTensorToCVMat(t_disp, CV_32FC1, 1, std::get<0>(padding) * -1, std::get<1>(padding) * -1);
+    // already done in TorchTensorToCVMat
+    /* disp = cv::Mat(disp, cv::Rect(std::get<0>(padding), std::get<1>(padding), img_size.width, img_size.height)); */
+
     /* // set inf to -1 */
     /* cv::Mat inf_mask = disp == std::numeric_limits<float>::infinity(); */
     /* disp.setTo(-1.0f, inf_mask); */
@@ -154,8 +156,9 @@ void HighResStereoMatcher::CalculateDisparity(
     if (entropy.needed()) {
         if (get_clean() >= 0.0) {
             auto t_ent = result->elements()[1].toTensor();
-            auto ent = utils::TorchTensorToCVMat(t_ent, CV_32FC1, 1);
-            ent = cv::Mat(ent, cv::Rect(std::get<0>(padding), std::get<1>(padding), img_size.width, img_size.height));
+            auto ent = utils::TorchTensorToCVMat(t_ent, CV_32FC1, 1, std::get<0>(padding) * -1, std::get<1>(padding) * -1);
+            // already done in TorchTensorToCVMat
+            /* ent = cv::Mat(ent, cv::Rect(std::get<0>(padding), std::get<1>(padding), img_size.width, img_size.height)); */
             entropy.assign(ent);
         } else {
             entropy.clear();
