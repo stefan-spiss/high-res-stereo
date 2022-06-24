@@ -165,4 +165,80 @@ void HighResStereoMatcher::CalculateDisparity(
         }
     }
 }
+
+void HighResStereoMatcher::CalculateDisparities(cv::InputArrayOfArrays imgs_left, cv::InputArrayOfArrays imgs_right,
+    cv::OutputArrayOfArrays disparities, cv::OutputArrayOfArrays entropies)
+{
+    std::vector<cv::Mat> imgs_l;
+    imgs_left.getMatVector(imgs_l);
+    std::vector<cv::Mat> imgs_r;
+    imgs_right.getMatVector(imgs_r);
+
+    if (imgs_l.empty() || imgs_r.empty()) {
+        throw std::invalid_argument(
+            utils::InitErrorMsg("one of the input image batches is empty", __func__, __FILE__, __LINE__));
+    }
+    if (imgs_l.size() != imgs_r.size()) {
+        throw std::invalid_argument(utils::InitErrorMsg(
+            "number of input images differ between left and right batches", __func__, __FILE__, __LINE__));
+    }
+    cv::Size img_size = imgs_l[0].size();
+    if (img_size.empty()) {
+        throw std::invalid_argument(utils::InitErrorMsg("input image size empty", __func__, __FILE__, __LINE__));
+    }
+    for (auto i=0u; i<imgs_l.size(); i++) {
+        if (imgs_r[i].empty() || imgs_l[i].empty()) {
+            throw std::invalid_argument(
+                utils::InitErrorMsg("at least one input image is empty", __func__, __FILE__, __LINE__));
+        }
+        if (imgs_l[i].size() != img_size && imgs_l[i].size() != imgs_r[i].size()) {
+            throw std::invalid_argument(utils::InitErrorMsg(
+                "image size differs for at least one input image", __func__, __FILE__, __LINE__));
+        }
+        if (imgs_l[i].channels() != 3 || imgs_l[i].channels() != imgs_r[i].channels()) {
+            throw std::invalid_argument(utils::InitErrorMsg(
+                "number of channels != 3 for at least one of the input images", __func__, __FILE__, __LINE__));
+        }
+    }
+    // Disable gradient calculation
+    torch::NoGradGuard no_grad;
+
+    auto net_img_size = utils::CalculateNetworkImgSize(img_size);
+    std::tuple<int, int> padding = utils::CalculateImgPadding(img_size, net_img_size);
+
+    torch::Tensor t_imgs_l, t_imgs_r;
+
+    utils::InputTensorFromImages(imgs_l, t_imgs_l, norm_mean_, norm_std_, std::get<0>(padding), std::get<1>(padding));
+    utils::InputTensorFromImages(imgs_r, t_imgs_r, norm_mean_, norm_std_, std::get<0>(padding), std::get<1>(padding));
+    t_imgs_l = t_imgs_l.to(target_device_);
+    t_imgs_r = t_imgs_r.to(target_device_);
+
+    auto result = model_.forward({ t_imgs_l, t_imgs_r }).toTuple();
+
+    auto t_disp = result->elements()[0].toTensor();
+    std::vector<cv::Mat> disps;
+    utils::TorchTensorToCVMats(t_disp, disps, CV_32FC1, 1, std::get<0>(padding) * -1, std::get<1>(padding) * -1);
+    // already done in TorchTensorToCVMat
+    /* std::for_each(std::execution::par, disps.begin(), disps.end(), [&padding, &img_size](cv::Mat& disp) { */
+    /*     disp = cv::Mat(disp, cv::Rect(std::get<0>(padding), std::get<1>(padding), img_size.width, img_size.height)); */
+    /* }); */
+
+    disparities.create(disps.size(), 1, CV_32FC1);
+    disparities.assign(disps);
+
+    if (entropies.needed()) {
+        if (get_clean() >= 0.0) {
+            auto t_ent = result->elements()[1].toTensor();
+            std::vector<cv::Mat> ents;
+            utils::TorchTensorToCVMats(t_ent, ents, CV_32FC1, 1, std::get<0>(padding) * -1, std::get<1>(padding) * -1);
+            // already done in TorchTensorToCVMat
+            /* std::for_each(std::execution::par, ents.begin(), ents.end(), [&padding, &img_size](cv::Mat& ent) { */
+            /*     ent = cv::Mat(ent, cv::Rect(std::get<0>(padding), std::get<1>(padding), img_size.width, img_size.height)); */
+            /* }); */
+
+            entropies.create(ents.size(), 1, CV_32FC1);
+            entropies.assign(ents);
+        }
+    }
+}
 }

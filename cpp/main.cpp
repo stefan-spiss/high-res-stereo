@@ -31,7 +31,9 @@ int main(int argc, const char* argv[])
           "{res_scale           |1.0   |output resolution multiplier}"
           "{n_runs              |1     |number of runs, the matching should be performed (for runtime measurement)}"
           "{output_folder_path  |      |if not empty, disparity images are stored there as disparity.png and "
-          "disparity.pfm}";
+          "disparity.pfm}"
+          "{n_multi_test        |1     |number of stereo pairs used as image to test matching of multi-stereopairs at "
+          "once}";
     cv::CommandLineParser parser(argc, argv, keys);
 
     if (parser.has("help")) {
@@ -50,6 +52,7 @@ int main(int argc, const char* argv[])
     float resolution_scale = parser.get<float>("res_scale");
     int n_runs = parser.get<int>("n_runs");
     std::string output_folder_path = parser.get<std::string>("output_folder_path");
+    int n_multi_test = parser.get<int>("n_multi_test");
 
     if (!parser.check()) {
         parser.printMessage();
@@ -139,7 +142,7 @@ int main(int argc, const char* argv[])
         cv::resize(entropy, entropy, input_img_size);
         cv::imshow("entropy", entropy);
     }
-    cv::waitKey(0);
+    /* cv::waitKey(0); */
 
     std::filesystem::path out_path = output_folder_path;
     if (!output_folder_path.empty() && std::filesystem::is_directory(out_path)) {
@@ -151,5 +154,51 @@ int main(int argc, const char* argv[])
         cv::imwrite(out_path / (ss.str() + ".pfm"), disparity);
     }
 
+    std::vector<cv::Mat> disparities, entropies;
+    std::vector<cv::Mat> left_imgs;
+    std::vector<cv::Mat> right_imgs;
+
+    for (auto i = 0; i < n_multi_test; i++) {
+        left_imgs.push_back(left_img.clone());
+        right_imgs.push_back(right_img.clone());
+    }
+    for (auto i = 0; i < n_runs; i++) {
+        if (run_cuda)
+            torch::cuda::synchronize();
+        auto start = std::chrono::high_resolution_clock::now();
+        stereo_matcher.CalculateDisparities(left_imgs, right_imgs, disparities, entropies);
+        if (run_cuda)
+            torch::cuda::synchronize();
+        auto stop = std::chrono::high_resolution_clock::now();
+        times[i] = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+        std::cout << "run: " << i << " - runtime: " << times[i] << std::endl;
+    }
+
+    if (n_runs > 1) {
+        std::cout << "mean runtime: " << std::reduce(times.begin(), times.end()) / static_cast<float>(times.size())
+                  << std::endl;
+        std::cout << "mean runtime per image: "
+                  << std::reduce(times.begin(), times.end()) / static_cast<float>(times.size())
+                / static_cast<float>(left_imgs.size())
+                  << std::endl;
+    }
+
+    if (!disparities.empty()) {
+        for (auto i = 0u; i < disparities.size(); i++) {
+            cv::resize(disparities[i] / resolution_scale, disparities[i], input_img_size);
+            cv::Mat disp_vis;
+            GetDisparityVisualize(disparities[i], disp_vis, stereo_matcher.get_max_disp() / resolution_scale, 0);
+            cv::imshow("disparities" + std::to_string(i), disp_vis);
+
+            if (!entropies.empty()) {
+                if (!entropies[i].empty()) {
+                    cv::resize(entropies[i], entropies[i], input_img_size);
+                    cv::imshow("entropies" + std::to_string(i), entropies[i]);
+                }
+            }
+        }
+    }
+
+    cv::waitKey(0);
     return 0;
 }

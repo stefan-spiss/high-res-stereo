@@ -19,7 +19,12 @@ namespace utils {
 
     cv::Mat TorchTensorToCVMat(const torch::Tensor& in, int rtype, int channels, const int pad_left = 0, const int pad_top = 0);
 
+    void TorchTensorToCVMats(const torch::Tensor& in, cv::OutputArrayOfArrays out, int rtype, int channels, const int pad_left = 0, const int pad_top = 0);
+
     void InputTensorFromImage(const cv::Mat& img, torch::Tensor& out_tensor, const std::array<double, 3>& norm_mean,
+        const std::array<double, 3>& norm_std, const int pad_left = 0, const int pad_top = 0);
+
+    void InputTensorFromImages(cv::InputArrayOfArrays images, torch::Tensor& out_tensor, const std::array<double, 3>& norm_mean,
         const std::array<double, 3>& norm_std, const int pad_left = 0, const int pad_top = 0);
 
     void InputBlobFromImage(const cv::Mat& img, cv::Mat& out, const cv::Scalar& norm_mean, const cv::Scalar& norm_std,
