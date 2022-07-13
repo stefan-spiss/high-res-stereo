@@ -55,3 +55,7 @@ def create_script_model(module, imgL, imgR):
     script_module = torch.jit.script(module, optimize=True, example_inputs=example_input)
     return script_module
 
+def export_onnx_model(model, imgL, imgR, filename, input_names, output_names):
+    print("Creating onnx model")
+    example_input = (imgL, imgR)
+    return torch.onnx.export(model, example_input, filename, input_names=input_names, output_names=output_names, verbose=True, opset_version=11)
