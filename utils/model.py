@@ -51,7 +51,7 @@ def create_script_model(module, imgL, imgR):
     script_module = None
     # with torch.no_grad():
     # with torch.jit.optimized_execution(True):
-    exampleInput = [(imgL, imgR)]
-    script_module = torch.jit.script(module, optimize=True, example_inputs=exampleInput)
+    example_input = [(imgL, imgR)]
+    script_module = torch.jit.script(module, optimize=True, example_inputs=example_input)
     return script_module
 
