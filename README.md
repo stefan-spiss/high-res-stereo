@@ -22,8 +22,8 @@ Able to handle large view variation of high-res images (as a submodule in [Open4
 
 ## Weights
 
-- [Middlebury model (more robust)](http://www.contrib.andrew.cmu.edu/~gengshay/wordpress/wp-content/uploads/2020/01/final-768px.tar)
-- [KITTI model (specified to KITTI)](http://www.contrib.andrew.cmu.edu/~gengshay/wordpress/wp-content/uploads/2020/01/kitti.tar)
+- [Middlebury model (more robust)](https://github.com/gengshan-y/high-res-stereo/blob/www/final-768px.tar)
+- [KITTI model (specialized to KITTI)](https://github.com/gengshan-y/high-res-stereo/blob/www/kitti.tar)
 - [Google drive (backup link)](https://drive.google.com/file/d/1BlH7IafX-X0A5kFPd50WkZXqxo0_gtoI/view?usp=sharing)
 
 Note: The .tar file can be directly loaded in pytorch. No need to uncompress it.
@@ -73,7 +73,7 @@ uncertainty map (brighter->higher uncertainty)
 - [Eth3D](https://www.eth3d.net/datasets#low-res-two-view-training-data)
 
 ### test
-[High-res-real-stereo (HR-RS)](): comming soon
+High-res-real-stereo (HR-RS) It has been taken off due to licensing issue. Please use the [Argoverse dataset](https://eval.ai/web/challenges/challenge-page/1704/overview).
 
 ## Train
 1. Download and extract training data in folder /d/. Training data include Middlebury train set, HR-VS, KITTI-12/15, ETH3D, and SceneFlow.
