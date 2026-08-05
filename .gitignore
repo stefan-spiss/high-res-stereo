@@ -57,6 +57,12 @@ build-debug
 debug
 *build*/
 
+# nix
+.venv
+.venv-*
+result
+result-*
+
 # intellij
 .idea
 cmake-build-debug
@@ -73,3 +79,6 @@ pointclouds/
 compile_commands.json
 
 venv/
+.direnv
+.envrc
+.cache/

@@ -1,0 +1,21 @@
+# Python deps installed as prebuilt wheels into the Nix-managed .venv (flake.nix).
+# All wheels -> nothing compiles; only downloads.
+#
+# The PyTorch wheel index is NOT pinned here: flake.nix passes it per shell via
+# `pip install --index-url ...` -> cu130 for the CUDA shell (`nix develop`),
+# cpu for the CPU-only shell (`nix develop .#cpu`). cu130 lines up with the
+# CUDA-13 libtorch/NVRTC the C++ side uses and supports the RTX 5070 (Blackwell,
+# sm_120). opencv-python (not -headless) gives cv2 with a Qt GUI so cv2.imshow
+# works; the required Qt/xcb runtime libs are on LD_LIBRARY_PATH in flake.nix.
+
+torch==2.9.0
+torchvision==0.24.0
+torchviz==0.0.3
+
+opencv-python
+numpy
+scipy
+scikit-image
+pillow
+matplotlib
+texttable

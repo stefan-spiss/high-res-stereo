@@ -57,6 +57,11 @@ int main(int argc, const char* argv[])
         return 0;
     }
 
+    // The matcher falls back to CPU when CUDA was requested but no GPU is
+    // available; mirror that here so the timing torch::cuda::synchronize() calls
+    // below aren't issued on a CPU-only host (they throw "No CUDA GPUs available").
+    run_cuda = run_cuda && torch::cuda::is_available();
+
     std::cout << "device: " << (run_cuda ? "cuda" : "cpu") << std::endl;
 
     high_res_stereo::HighResStereoMatcher stereo_matcher(model_file_path,
