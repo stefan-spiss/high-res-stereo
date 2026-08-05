@@ -110,11 +110,11 @@ class myImageFloder(data.Dataset):
         h, w,_ = left_img.shape
         top_pad = max_h - h
         left_pad = max_w - w
-        left_img = np.lib.pad(left_img, ((top_pad, 0), (0, left_pad),(0,0)), mode='constant', constant_values=0)
-        right_img = np.lib.pad(right_img, ((top_pad, 0), (0, left_pad),(0,0)), mode='constant', constant_values=0)
+        left_img = np.pad(left_img, ((top_pad, 0), (0, left_pad),(0,0)), mode='constant', constant_values=0)
+        right_img = np.pad(right_img, ((top_pad, 0), (0, left_pad),(0,0)), mode='constant', constant_values=0)
 
         dataL = np.expand_dims(np.expand_dims(dataL, 0), 0)
-        dataL = np.lib.pad(dataL, ((0, 0), (0, 0), (top_pad, 0), (0, left_pad)), mode='constant', constant_values=0)[0,0]
+        dataL = np.pad(dataL, ((0, 0), (0, 0), (top_pad, 0), (0, left_pad)), mode='constant', constant_values=0)[0,0]
         dataL = np.ascontiguousarray(dataL, dtype=np.float32)
 
         processed = preprocess.get_transform()

@@ -114,8 +114,8 @@ def main():
 
         top_pad = max_h-imgL.shape[2]
         left_pad = max_w-imgL.shape[3]
-        imgL = np.lib.pad(imgL,((0,0),(0,0),(top_pad,0),(0,left_pad)),mode='constant',constant_values=0)
-        imgR = np.lib.pad(imgR,((0,0),(0,0),(top_pad,0),(0,left_pad)),mode='constant',constant_values=0)
+        imgL = np.pad(imgL,((0,0),(0,0),(top_pad,0),(0,left_pad)),mode='constant',constant_values=0)
+        imgR = np.pad(imgR,((0,0),(0,0),(top_pad,0),(0,left_pad)),mode='constant',constant_values=0)
 
         # test
         imgL = Variable(torch.FloatTensor(imgL).cuda())

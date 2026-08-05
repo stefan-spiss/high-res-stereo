@@ -43,8 +43,8 @@ def load_image_pair(left_img_path, right_img_path, scale_factor):
 
     top_pad = h_img_net_in-imgL.shape[2]
     left_pad = w_img_net_in-imgL.shape[3]
-    imgL = np.lib.pad(imgL,((0,0),(0,0),(top_pad,0),(0,left_pad)),mode='constant',constant_values=0)
-    imgR = np.lib.pad(imgR,((0,0),(0,0),(top_pad,0),(0,left_pad)),mode='constant',constant_values=0)
+    imgL = np.pad(imgL,((0,0),(0,0),(top_pad,0),(0,left_pad)),mode='constant',constant_values=0)
+    imgR = np.pad(imgR,((0,0),(0,0),(top_pad,0),(0,left_pad)),mode='constant',constant_values=0)
 
     return imgL, imgR, input_img_size, input_img_size_scaled, (h_img_net_in, w_img_net_in)
 
