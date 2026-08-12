@@ -6,6 +6,15 @@
 
 namespace high_res_stereo {
 
+inline torch::Device selectBestDevice()
+{
+    if (torch::cuda::is_available())
+        return torch::Device(torch::kCUDA);
+    if (torch::mps::is_available())
+        return torch::Device(torch::kMPS);
+    return torch::Device(torch::kCPU);
+}
+
 class HighResStereoMatcher {
 public:
     HighResStereoMatcher(const std::string& model_path, const torch::Device& target_device = torch::Device(torch::kCPU),

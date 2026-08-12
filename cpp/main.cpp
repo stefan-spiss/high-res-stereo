@@ -24,7 +24,7 @@ int main(int argc, const char* argv[])
           "{traced              |false |must be true if traced model used}"
           "{clean               |1.0   |entropy threshold to be used for cleaning (filtering) the "
           "disparity, < 0.0: no cleaning}"
-          "{cuda                |true  |if true, cuda is used when possible, otherwise cpu}"
+          "{device              |auto  |device to use: auto (picks best available), cpu, cuda, mps}"
           "{level               |1     |level of decoder network to use as output (level 1: highest "
           "resolution, level 3: lowest resolution)}"
           "{max_disp            |-1    |maximum disparity, if -1, default value of model is used)}"
@@ -44,7 +44,7 @@ int main(int argc, const char* argv[])
     std::string image_file_path_right = parser.get<std::string>(2);
     bool traced = parser.get<bool>("traced");
     float clean = parser.get<float>("clean");
-    bool run_cuda = parser.get<bool>("cuda");
+    std::string device_str = parser.get<std::string>("device");
     int level = parser.get<int>("level");
     int max_disp = parser.get<int>("max_disp");
     float resolution_scale = parser.get<float>("res_scale");
@@ -57,15 +57,19 @@ int main(int argc, const char* argv[])
         return 0;
     }
 
-    // The matcher falls back to CPU when CUDA was requested but no GPU is
-    // available; mirror that here so the timing torch::cuda::synchronize() calls
-    // below aren't issued on a CPU-only host (they throw "No CUDA GPUs available").
-    run_cuda = run_cuda && torch::cuda::is_available();
+    torch::Device target_device = torch::Device(torch::kCPU);
+    if (device_str == "auto") {
+        target_device = high_res_stereo::selectBestDevice();
+    } else if (device_str == "cuda") {
+        target_device = torch::Device(torch::kCUDA);
+    } else if (device_str == "mps") {
+        target_device = torch::Device(torch::kMPS);
+    }
 
-    std::cout << "device: " << (run_cuda ? "cuda" : "cpu") << std::endl;
+    std::cout << "device: " << target_device << std::endl;
 
-    high_res_stereo::HighResStereoMatcher stereo_matcher(model_file_path,
-        run_cuda ? torch::Device(torch::kCUDA) : torch::Device(torch::kCPU), traced, image_net_mean, image_net_std);
+    high_res_stereo::HighResStereoMatcher stereo_matcher(
+        model_file_path, target_device, traced, image_net_mean, image_net_std);
 
     auto initial_clean = stereo_matcher.get_clean();
     if (stereo_matcher.set_clean(clean)) {
@@ -115,16 +119,21 @@ int main(int argc, const char* argv[])
         std::cout << "model warm up failed" << std::endl;
     }
 
+    auto sync_device = [&]() {
+        if (stereo_matcher.target_device().type() == torch::kCUDA)
+            torch::cuda::synchronize();
+        else if (stereo_matcher.target_device().type() == torch::kMPS)
+            torch::mps::synchronize();
+    };
+
     std::vector<double> times(n_runs);
 
     cv::Mat disparity, entropy;
     for (auto i = 0; i < n_runs; i++) {
-        if (run_cuda)
-            torch::cuda::synchronize();
+        sync_device();
         auto start = std::chrono::high_resolution_clock::now();
         stereo_matcher.CalculateDisparity(left_img, right_img, disparity, entropy);
-        if (run_cuda)
-            torch::cuda::synchronize();
+        sync_device();
         auto stop = std::chrono::high_resolution_clock::now();
         times[i] = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
         std::cout << "run: " << i << " - runtime: " << times[i] << std::endl;

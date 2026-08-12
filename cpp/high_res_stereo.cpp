@@ -18,9 +18,9 @@ HighResStereoMatcher::HighResStereoMatcher(const std::string& model_path, const 
     if (target_device.type() == torch::kCUDA && !torch::cuda::is_available()) {
         utils::PrintError("CUDA device chosen, but CUDA not available -> target device set to CPU" + model_path,
             __func__, __FILE__, __LINE__);
-        /* auto loc = std::source_location::current(); */
-        /* PrintError("CUDA device chosen, but CUDA not available -> target device set to CPU", loc.function_name(),
-         * loc.file_name(), loc.line()); */
+    } else if (target_device.type() == torch::kMPS && !torch::mps::is_available()) {
+        utils::PrintError("MPS device chosen, but MPS not available -> target device set to CPU",
+            __func__, __FILE__, __LINE__);
     } else {
         target_device_ = target_device;
     }
@@ -57,9 +57,9 @@ bool HighResStereoMatcher::set_target_device(const torch::Device& target_device)
     if (target_device.type() == torch::kCUDA && !torch::cuda::is_available()) {
         utils::PrintError(
             "CUDA device chosen, but CUDA not available -> target device not changed", __func__, __FILE__, __LINE__);
-        /* auto loc = std::source_location::current(); */
-        /* PrintError("CUDA device chosen, but CUDA not available -> target device not changed", loc.function_name(),
-         * loc.file_name(), loc.line()); */
+    } else if (target_device.type() == torch::kMPS && !torch::mps::is_available()) {
+        utils::PrintError(
+            "MPS device chosen, but MPS not available -> target device not changed", __func__, __FILE__, __LINE__);
     } else {
         try {
             model_.to(target_device);
@@ -93,10 +93,14 @@ bool HighResStereoMatcher::WarmUpModel(cv::Size img_size, unsigned int n_runs)
             double processingTime;
             if (target_device_ == torch::kCUDA)
                 torch::cuda::synchronize();
+            else if (target_device_ == torch::kMPS)
+                torch::mps::synchronize();
             auto start = std::chrono::high_resolution_clock::now();
             model_.forward({ lTensTmp, rTensTmp });
             if (target_device_ == torch::kCUDA)
                 torch::cuda::synchronize();
+            else if (target_device_ == torch::kMPS)
+                torch::mps::synchronize();
             auto stop = std::chrono::high_resolution_clock::now();
             processingTime = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
             std::cout << "Warm up - run " << i << " - Runtime: " << processingTime << std::endl;
